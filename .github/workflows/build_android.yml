@@ -1,0 +1,70 @@
+name: Build Protobuf for Android arm64-v8a
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-16.04  # Menggunakan Ubuntu 16.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set up Android NDK
+        run: |
+          mkdir -p $HOME/Android
+          cd $HOME/Android
+          wget https://dl.google.com/android/repository/android-ndk-r16b-linux-x86_64.zip
+          unzip android-ndk-r16b-linux-x86_64.zip
+          rm android-ndk-r16b-linux-x86_64.zip
+
+      - name: Clone Protobuf Repository
+        run: |
+          git clone https://github.com/protocolbuffers/protobuf.git
+          cd protobuf
+          git checkout v3.5.1
+
+      - name: Build Protobuf for Android arm64-v8a
+        run: |
+          cd protobuf
+          ./autogen.sh
+
+          # Membuat skrip build
+          echo '#!/bin/bash' > build-protobuf-android.sh
+          echo 'export NDK_ROOT=$HOME/Android/android-ndk-r16b' >> build-protobuf-android.sh
+          echo 'export PREFIX=$HOME/Android/protobuf-3.5.1/' >> build-protobuf-android.sh
+          echo 'export PATH=$HOME/Android/arm-21-toolchain/bin:$PATH' >> build-protobuf-android.sh
+          echo 'export SYSROOT=$HOME/Android/arm-21-toolchain/sysroot' >> build-protobuf-android.sh
+          echo 'export CC="aarch64-linux-android-gcc --sysroot $SYSROOT"' >> build-protobuf-android.sh
+          echo 'export CXX="aarch64-linux-android-g++ --sysroot $SYSROOT"' >> build-protobuf-android.sh
+          echo 'export CXXSTL=$NDK_ROOT/sources/cxx-stl/gnu-libstdc++/4.9' >> build-protobuf-android.sh
+          
+          echo '../configure \\' >> build-protobuf-android.sh
+          echo '  --prefix=$PREFIX \\' >> build-protobuf-android.sh
+          echo '  --host=aarch64-linux-android \\' >> build-protobuf-android.sh
+          echo '  --with-sysroot="${SYSROOT}" \\' >> build-protobuf-android.sh
+          echo '  --enable-shared \\' >> build-protobuf-android.sh
+          echo '  --enable-cross-compile \\' >> build-protobuf-android.sh
+          echo '  --with-protoc=protoc \\' >> build-protobuf-android.sh
+          echo '  CFLAGS="-march=armv8-a -D__ANDROID_API__=21" \\' >> build-protobuf-android.sh
+          echo '  CXXFLAGS="-frtti -fexceptions -march=armv8-a \\' >> build-protobuf-android.sh
+          echo '    -I${NDK_ROOT}/sources/android/support/include \\' >> build-protobuf-android.sh
+          echo '    -I${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include \\' >> build-protobuf-android.sh
+          echo '    -I${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include -D__ANDROID_API__=21" \\' >> build-protobuf-android.sh
+          echo '  LDFLAGS="-L${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a" \\' >> build-protobuf-android.sh
+          echo '  LIBS="-llog -lz -lgnustl_static"' >> build-protobuf-android.sh
+
+          chmod +x build-protobuf-android.sh
+
+          # Membangun Protobuf
+          bash build-protobuf-android.sh
+
+      - name: Check Build Output
+        run: |
+          tree $HOME/Android/protobuf-3.5.1/
